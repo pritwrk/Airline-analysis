@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U.S. Airline Performance — SQL Analysis</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #0b0f1a;
+      --surface:   #111827;
+      --surface2:  #1a2235;
+      --border:    #1e2d45;
+      --accent:    #3b82f6;
+      --accent2:   #60a5fa;
+      --amber:     #f59e0b;
+      --green:     #10b981;
+      --red:       #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --code-bg:   #0d1117;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 80px 40px 60px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(160deg, #0b0f1a 0%, #0f1e38 60%, #0b0f1a 100%);
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231e3a5f' fill-opacity='0.25'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+    .header-inner {
+      position: relative;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .header-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.25);
+      padding: 5px 12px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+    }
+    .header-eyebrow::before {
+      content: '✈';
+      font-size: 13px;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    h1 span { color: var(--accent2); }
+    .header-sub {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 560px;
+      margin-bottom: 40px;
+    }
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+    .badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .badge.green { border-color: rgba(16,185,129,0.4); color: var(--green); background: rgba(16,185,129,0.07); }
+    .badge.blue  { border-color: rgba(59,130,246,0.4);  color: var(--accent2); background: rgba(59,130,246,0.07); }
+
+    /* ── KPI STRIP ── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .kpi-item {
+      padding: 28px 32px;
+      border-right: 1px solid var(--border);
+    }
+    .kpi-item:last-child { border-right: none; }
+    .kpi-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+      margin-bottom: 8px;
+    }
+    .kpi-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .kpi-value.blue   { color: var(--accent2); }
+    .kpi-value.amber  { color: var(--amber); }
+    .kpi-value.green  { color: var(--green); }
+    .kpi-value.red    { color: var(--red); }
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(11,15,26,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+    .nav-inner a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 16px 20px;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 0.03em;
+    }
+    .nav-inner a:hover { color: var(--text); }
+    .nav-inner a.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+    /* ── MAIN LAYOUT ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 60px 40px; }
+
+    /* ── PHASE SECTIONS ── */
+    .phase-block { margin-bottom: 80px; }
+    .phase-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .phase-number {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.3);
+      padding: 4px 10px;
+      border-radius: 3px;
+    }
+    .phase-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .phase-divider {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── QUERY CARDS ── */
+    .query-grid { display: flex; flex-direction: column; gap: 24px; }
+    .query-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .query-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      gap: 12px;
+    }
+    .query-header:hover { background: var(--surface2); }
+    .query-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+    .query-num {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(59,130,246,0.1);
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid rgba(59,130,246,0.2);
+      min-width: 44px;
+      text-align: center;
+    }
+    .query-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 15px;
+    }
+    .query-tag {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .chevron {
+      color: var(--muted);
+      font-size: 12px;
+      transition: transform 0.25s;
+      flex-shrink: 0;
+    }
+    .query-card.open .chevron { transform: rotate(180deg); }
+    .query-body { display: none; }
+    .query-card.open .query-body { display: block; }
+
+    .code-block {
+      background: var(--code-bg);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .code-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 10px 20px 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .code-label::before {
+      content: '';
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 14px 0 0 #f59e0b, 28px 0 0 #10b981;
+    }
+    pre {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 4px 20px 20px;
+      overflow-x: auto;
+      color: #c9d1d9;
+    }
+    .kw  { color: #ff7b72; }
+    .fn  { color: #79c0ff; }
+    .str { color: #a5d6ff; }
+    .cm  { color: #8b949e; font-style: italic; }
+    .num { color: #f2cc60; }
+
+    /* ── RESULTS TABLE ── */
+    .result-block {
+      padding: 20px;
+    }
+    .result-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--green);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .result-label::before {
+      content: '▶';
+      font-size: 9px;
+    }
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12.5px;
+    }
+    .result-table thead tr {
+      background: rgba(59,130,246,0.08);
+      border-bottom: 1px solid rgba(59,130,246,0.2);
+    }
+    .result-table th {
+      text-align: left;
+      padding: 9px 14px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--accent2);
+      font-weight: 500;
+    }
+    .result-table td {
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+    .result-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .result-table tr:last-child td { border-bottom: none; }
+    .num-cell { color: var(--amber); }
+    .pct-cell { color: var(--green); }
+    .row-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    /* ── SCHEMA ── */
+    .schema-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .schema-card {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .schema-card-head {
+      background: rgba(59,130,246,0.1);
+      border-bottom: 1px solid rgba(59,130,246,0.2);
+      padding: 10px 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--accent2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .schema-card-head span { color: var(--muted); font-size: 11px; }
+    .schema-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+    }
+    .schema-row:last-child { border-bottom: none; }
+    .schema-col-name { color: var(--text); }
+    .schema-col-type { color: var(--muted); font-size: 11px; }
+    .pk { color: var(--amber); }
+    .fk { color: var(--accent2); }
+
+    /* ── POWER BI SECTION ── */
+    .powerbi-section { margin-bottom: 80px; }
+    .powerbi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    .powerbi-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+    .powerbi-placeholder {
+      font-size: 36px;
+      opacity: 0.3;
+    }
+    .powerbi-placeholder-text {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .powerbi-tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.25);
+      padding: 4px 10px;
+      border-radius: 3px;
+    }
+
+    /* ── INSIGHT CARDS ── */
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .insight-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px;
+    }
+    .insight-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-bottom: 4px;
+    }
+    .insight-desc {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px;
+      text-align: center;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--accent2); }
+    .footer-credit {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    @media (max-width: 768px) {
+      header { padding: 48px 20px 40px; }
+      main { padding: 40px 20px; }
+      nav { padding: 0 20px; }
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .kpi-item { border-right: none; border-bottom: 1px solid var(--border); }
+      .schema-grid { grid-template-columns: 1fr; }
+      .powerbi-grid { grid-template-columns: 1fr; }
+      .insight-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="header-eyebrow">U.S. Airline Performance &amp; Delay Analysis · 2015</div>
+    <h1>Airline Data<br><span>SQL Analysis</span></h1>
+    <p class="header-sub">
+      Dissecting 5.8 million flight records across 14 airlines —
+      from raw CSV to cleaned insights using structured SQL.
+    </p>
+    <div class="header-badges">
+      <span class="badge blue">MySQL Workbench 8.0</span>
+      <span class="badge green">6 KPI Queries ✓</span>
+      <span class="badge">3 Tables · 1 View</span>
+      <span class="badge">5.8M Rows</span>
+      <span class="badge">Phase 1 → 2 → 3</span>
+    </div>
+  </div>
+</header>
+
+<!-- KPI STRIP -->
+<div class="kpi-strip">
+  <div class="kpi-item">
+    <div class="kpi-label">Total Flights</div>
+    <div class="kpi-value blue">5.8M</div>
+    <div class="kpi-sub">2015 full year</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-label">Airlines Tracked</div>
+    <div class="kpi-value amber">14</div>
+    <div class="kpi-sub">US domestic carriers</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-label">Cancellation Rate</div>
+    <div class="kpi-value red">~1.5%</div>
+    <div class="kpi-sub">Avg across all carriers</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-label">Airports</div>
+    <div class="kpi-value green">322</div>
+    <div class="kpi-sub">Coverage nationwide</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#schema" class="active">Schema</a>
+    <a href="#phase1">Phase 1 · Setup</a>
+    <a href="#phase2">Phase 2 · Cleaning</a>
+    <a href="#phase3">Phase 3 · KPIs</a>
+    <a href="#powerbi">Power BI</a>
+    <a href="#insights">Insights</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- SCHEMA -->
+  <section id="schema" class="phase-block">
+    <div class="phase-label">
+      <span class="phase-number">Schema</span>
+      <span class="phase-title">Database Design</span>
+      <div class="phase-divider"></div>
+    </div>
+
+    <!-- SVG Top-Down Schema Diagram -->
+    <div style="background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:32px 20px; overflow-x:auto;">
+      <svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:900px; display:block; margin:0 auto; font-family:'IBM Plex Mono',monospace;">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity="0.7"/>
+          </marker>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa" opacity="0.6"/>
+          </marker>
+        </defs>
+
+        <!-- ── FLIGHTS (center top) ── -->
+        <rect x="280" y="20" width="340" height="240" rx="6" fill="#0d1117" stroke="#1e2d45" stroke-width="1.5"/>
+        <!-- header -->
+        <rect x="280" y="20" width="340" height="36" rx="6" fill="rgba(59,130,246,0.15)" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="280" y="44" width="340" height="12" fill="rgba(59,130,246,0.15)"/>
+        <text x="300" y="43" font-size="13" font-weight="600" fill="#60a5fa">✈  flights</text>
+        <text x="530" y="43" font-size="10" fill="#64748b" text-anchor="end">Main table · 5.8M rows</text>
+
+        <!-- rows -->
+        <line x1="280" y1="56" x2="620" y2="56" stroke="#1e2d45" stroke-width="1"/>
+        <text x="296" y="73" font-size="11.5" fill="#f59e0b">FLIGHT_NUMBER</text><text x="590" y="73" font-size="10" fill="#64748b" text-anchor="end">INT</text>
+        <line x1="280" y1="80" x2="620" y2="80" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="97" font-size="11.5" fill="#60a5fa">AIRLINE</text><text x="590" y="97" font-size="10" fill="#64748b" text-anchor="end">VARCHAR(5) · FK</text>
+        <line x1="280" y1="104" x2="620" y2="104" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="121" font-size="11.5" fill="#60a5fa">ORIGIN_AIRPORT</text><text x="590" y="121" font-size="10" fill="#64748b" text-anchor="end">VARCHAR(5) · FK</text>
+        <line x1="280" y1="128" x2="620" y2="128" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="145" font-size="11.5" fill="#60a5fa">DESTINATION_AIRPORT</text><text x="590" y="145" font-size="10" fill="#64748b" text-anchor="end">VARCHAR(5) · FK</text>
+        <line x1="280" y1="152" x2="620" y2="152" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="169" font-size="11.5" fill="#e2e8f0">DEPARTURE_DELAY</text><text x="590" y="169" font-size="10" fill="#64748b" text-anchor="end">FLOAT</text>
+        <line x1="280" y1="176" x2="620" y2="176" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="193" font-size="11.5" fill="#e2e8f0">ARRIVAL_DELAY</text><text x="590" y="193" font-size="10" fill="#64748b" text-anchor="end">FLOAT</text>
+        <line x1="280" y1="200" x2="620" y2="200" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="217" font-size="11.5" fill="#e2e8f0">CANCELLED</text><text x="590" y="217" font-size="10" fill="#64748b" text-anchor="end">INT</text>
+        <line x1="280" y1="224" x2="620" y2="224" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="296" y="252" font-size="11.5" fill="#e2e8f0">WEATHER_DELAY · AIRLINE_DELAY · ...</text>
+
+        <!-- ── AIRLINES (bottom left) ── -->
+        <rect x="30" y="360" width="220" height="100" rx="6" fill="#0d1117" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="30" y="360" width="220" height="36" rx="6" fill="rgba(59,130,246,0.12)" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="30" y="384" width="220" height="12" fill="rgba(59,130,246,0.12)"/>
+        <text x="48" y="383" font-size="12" font-weight="600" fill="#60a5fa">🏢  airlines</text>
+        <text x="240" y="383" font-size="10" fill="#64748b" text-anchor="end">14 rows</text>
+        <line x1="30" y1="396" x2="250" y2="396" stroke="#1e2d45" stroke-width="1"/>
+        <text x="46" y="413" font-size="11" fill="#f59e0b">IATA_CODE</text><text x="242" y="413" font-size="10" fill="#64748b" text-anchor="end">PK · VARCHAR(5)</text>
+        <line x1="30" y1="420" x2="250" y2="420" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="46" y="437" font-size="11" fill="#e2e8f0">AIRLINE</text><text x="242" y="437" font-size="10" fill="#64748b" text-anchor="end">VARCHAR(100)</text>
+        <line x1="30" y1="444" x2="250" y2="444" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="46" y="457" font-size="11" fill="#e2e8f0">+ 1 more column</text>
+
+        <!-- ── AIRPORTS (bottom right) ── -->
+        <rect x="650" y="360" width="220" height="130" rx="6" fill="#0d1117" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="650" y="360" width="220" height="36" rx="6" fill="rgba(59,130,246,0.12)" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="650" y="384" width="220" height="12" fill="rgba(59,130,246,0.12)"/>
+        <text x="668" y="383" font-size="12" font-weight="600" fill="#60a5fa">📍  airports</text>
+        <text x="862" y="383" font-size="10" fill="#64748b" text-anchor="end">322 rows</text>
+        <line x1="650" y1="396" x2="870" y2="396" stroke="#1e2d45" stroke-width="1"/>
+        <text x="666" y="413" font-size="11" fill="#f59e0b">IATA_CODE</text><text x="862" y="413" font-size="10" fill="#64748b" text-anchor="end">PK · VARCHAR(5)</text>
+        <line x1="650" y1="420" x2="870" y2="420" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="666" y="437" font-size="11" fill="#e2e8f0">AIRPORT</text><text x="862" y="437" font-size="10" fill="#64748b" text-anchor="end">VARCHAR(200)</text>
+        <line x1="650" y1="444" x2="870" y2="444" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="666" y="461" font-size="11" fill="#e2e8f0">CITY / STATE</text><text x="862" y="461" font-size="10" fill="#64748b" text-anchor="end">VARCHAR</text>
+        <line x1="650" y1="468" x2="870" y2="468" stroke="#1e2d45" stroke-width="0.5"/>
+        <text x="666" y="485" font-size="11" fill="#e2e8f0">LATITUDE / LONGITUDE</text><text x="862" y="485" font-size="10" fill="#64748b" text-anchor="end">FLOAT</text>
+
+        <!-- ── ARROWS: flights → airlines ── -->
+        <!-- from AIRLINE FK row (y≈97) left side of flights box to top of airlines -->
+        <path d="M280,90 C200,90 140,280 140,360" stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrow)"/>
+        <rect x="148" y="215" width="94" height="22" rx="4" fill="#0b0f1a" stroke="#1e2d45" stroke-width="1"/>
+        <text x="195" y="230" font-size="10" fill="#64748b" text-anchor="middle">N : 1</text>
+
+        <!-- ── ARROWS: flights → airports (origin + dest) ── -->
+        <path d="M620,113 C720,113 760,260 760,360" stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrow)"/>
+        <rect x="672" y="215" width="94" height="22" rx="4" fill="#0b0f1a" stroke="#1e2d45" stroke-width="1"/>
+        <text x="719" y="230" font-size="10" fill="#64748b" text-anchor="middle">N : 1</text>
+
+        <!-- ── VIEW badge at bottom center ── -->
+        <rect x="330" y="460" width="240" height="40" rx="6" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.3)" stroke-width="1.5"/>
+        <text x="450" y="476" font-size="11" fill="#10b981" text-anchor="middle" font-weight="600">VIEW  flights_clean</text>
+        <text x="450" y="492" font-size="10" fill="#64748b" text-anchor="middle">JOIN across all 3 tables · used in all KPI queries</text>
+
+        <!-- arrow from flights to view -->
+        <line x1="450" y1="260" x2="450" y2="458" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" marker-end="url(#arrow2)"/>
+
+        <!-- Legend -->
+        <rect x="30" y="20" width="200" height="70" rx="5" fill="#0d1117" stroke="#1e2d45" stroke-width="1"/>
+        <text x="44" y="38" font-size="10" fill="#64748b">Legend</text>
+        <text x="44" y="55" font-size="11" fill="#f59e0b">■</text><text x="58" y="55" font-size="10" fill="#94a3b8"> Primary Key (PK)</text>
+        <text x="44" y="72" font-size="11" fill="#60a5fa">■</text><text x="58" y="72" font-size="10" fill="#94a3b8"> Foreign Key (FK)</text>
+        <line x1="44" y1="84" x2="90" y2="84" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,2"/><text x="96" y="88" font-size="10" fill="#94a3b8"> Relationship</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- PHASE 1 -->
+  <section id="phase1" class="phase-block">
+    <div class="phase-label">
+      <span class="phase-number">Phase 01</span>
+      <span class="phase-title">Database Setup &amp; Table Creation</span>
+      <div class="phase-divider"></div>
+    </div>
+
+    <div class="query-grid">
+
+      <!-- Q1 -->
+      <div class="query-card open" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Q1</span>
+            <span class="query-title">Create Database &amp; Airlines Table</span>
+          </div>
+          <span class="query-tag">CREATE TABLE</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">CREATE DATABASE IF NOT EXISTS</span> airline_analysis;
+<span class="kw">USE</span> airline_analysis;
+
+<span class="cm">-- Airlines lookup table</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">airlines</span> (
+    IATA_CODE  <span class="fn">VARCHAR</span>(<span class="num">5</span>)   <span class="kw">PRIMARY KEY</span>,
+    AIRLINE    <span class="fn">VARCHAR</span>(<span class="num">100</span>) <span class="kw">NOT NULL</span>
+);
+
+<span class="cm">-- Airports lookup table</span>
+<span class="kw">CREATE TABLE</span> <span class="fn">airports</span> (
+    IATA_CODE  <span class="fn">VARCHAR</span>(<span class="num">5</span>)   <span class="kw">PRIMARY KEY</span>,
+    AIRPORT    <span class="fn">VARCHAR</span>(<span class="num">200</span>),
+    CITY       <span class="fn">VARCHAR</span>(<span class="num">100</span>),
+    STATE      <span class="fn">VARCHAR</span>(<span class="num">50</span>),
+    COUNTRY    <span class="fn">VARCHAR</span>(<span class="num">50</span>),
+    LATITUDE   <span class="fn">FLOAT</span>,
+    LONGITUDE  <span class="fn">FLOAT</span>
+);</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Operation</th><th>Status</th><th>Rows</th></tr></thead>
+              <tbody>
+                <tr><td>CREATE DATABASE airline_analysis</td><td class="pct-cell">✓ Success</td><td class="num-cell">—</td></tr>
+                <tr><td>CREATE TABLE airlines</td><td class="pct-cell">✓ Success</td><td class="num-cell">14 rows after import</td></tr>
+                <tr><td>CREATE TABLE airports</td><td class="pct-cell">✓ Success</td><td class="num-cell">322 rows after import</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Q2</span>
+            <span class="query-title">Create Main Flights Table</span>
+          </div>
+          <span class="query-tag">CREATE TABLE</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">CREATE TABLE</span> <span class="fn">flights</span> (
+    YEAR                  <span class="fn">INT</span>,
+    MONTH                 <span class="fn">INT</span>,
+    DAY                   <span class="fn">INT</span>,
+    DAY_OF_WEEK           <span class="fn">INT</span>,
+    AIRLINE               <span class="fn">VARCHAR</span>(<span class="num">5</span>),
+    FLIGHT_NUMBER         <span class="fn">INT</span>,
+    ORIGIN_AIRPORT        <span class="fn">VARCHAR</span>(<span class="num">5</span>),
+    DESTINATION_AIRPORT   <span class="fn">VARCHAR</span>(<span class="num">5</span>),
+    DEPARTURE_DELAY       <span class="fn">FLOAT</span>,
+    ARRIVAL_DELAY         <span class="fn">FLOAT</span>,
+    CANCELLED             <span class="fn">INT</span>,
+    CANCELLATION_REASON   <span class="fn">VARCHAR</span>(<span class="num">5</span>),
+    AIR_SYSTEM_DELAY      <span class="fn">FLOAT</span>,
+    SECURITY_DELAY        <span class="fn">FLOAT</span>,
+    AIRLINE_DELAY         <span class="fn">FLOAT</span>,
+    LATE_AIRCRAFT_DELAY   <span class="fn">FLOAT</span>,
+    WEATHER_DELAY         <span class="fn">FLOAT</span>
+);</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Operation</th><th>Status</th><th>Note</th></tr></thead>
+              <tbody>
+                <tr><td>CREATE TABLE flights</td><td class="pct-cell">✓ Success</td><td class="num-cell">5,819,079 rows after import</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Q3</span>
+            <span class="query-title">Row Count Verification</span>
+          </div>
+          <span class="query-tag">SELECT COUNT</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span> <span class="fn">COUNT</span>(*) <span class="kw">AS</span> total_flights  <span class="kw">FROM</span> flights;
+<span class="kw">SELECT</span> <span class="fn">COUNT</span>(*) <span class="kw">AS</span> total_airlines <span class="kw">FROM</span> airlines;
+<span class="kw">SELECT</span> <span class="fn">COUNT</span>(*) <span class="kw">AS</span> total_airports <span class="kw">FROM</span> airports;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Table</th><th>Count</th></tr></thead>
+              <tbody>
+                <tr><td>total_flights</td><td class="num-cell">5,819,079</td></tr>
+                <tr><td>total_airlines</td><td class="num-cell">14</td></tr>
+                <tr><td>total_airports</td><td class="num-cell">322</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- PHASE 2 -->
+  <section id="phase2" class="phase-block">
+    <div class="phase-label">
+      <span class="phase-number">Phase 02</span>
+      <span class="phase-title">Data Cleaning &amp; Preparation</span>
+      <div class="phase-divider"></div>
+    </div>
+
+    <div class="query-grid">
+
+      <!-- Fix 1 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Fix 1</span>
+            <span class="query-title">NULL Arrival Delay for Cancelled Flights</span>
+          </div>
+          <span class="query-tag">UPDATE · NULLIF</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="cm">-- Cancelled flights cannot have a meaningful delay value</span>
+<span class="kw">UPDATE</span> flights
+<span class="kw">SET</span> ARRIVAL_DELAY = <span class="kw">NULL</span>
+<span class="kw">WHERE</span> CANCELLED = <span class="num">1</span>;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Operation</th><th>Rows Affected</th><th>Reason</th></tr></thead>
+              <tbody>
+                <tr><td>ARRIVAL_DELAY → NULL</td><td class="num-cell">~89,000</td><td>Cancelled flights</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fix 2 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Fix 2</span>
+            <span class="query-title">Replace Zero Delays with NULL</span>
+          </div>
+          <span class="query-tag">UPDATE · NULLIF</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="cm">-- Replaces 0 with NULL to correctly represent absence of delay</span>
+<span class="kw">UPDATE</span> flights
+<span class="kw">SET</span>
+    AIR_SYSTEM_DELAY    = <span class="fn">NULLIF</span>(AIR_SYSTEM_DELAY,    <span class="num">0</span>),
+    SECURITY_DELAY      = <span class="fn">NULLIF</span>(SECURITY_DELAY,      <span class="num">0</span>),
+    AIRLINE_DELAY       = <span class="fn">NULLIF</span>(AIRLINE_DELAY,       <span class="num">0</span>),
+    LATE_AIRCRAFT_DELAY = <span class="fn">NULLIF</span>(LATE_AIRCRAFT_DELAY, <span class="num">0</span>),
+    WEATHER_DELAY       = <span class="fn">NULLIF</span>(WEATHER_DELAY,       <span class="num">0</span>)
+<span class="kw">WHERE</span> CANCELLED = <span class="num">0</span> <span class="kw">AND</span> DEPARTURE_DELAY = <span class="num">0</span>;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Column</th><th>Change</th></tr></thead>
+              <tbody>
+                <tr><td>AIR_SYSTEM_DELAY</td><td class="pct-cell">0 → NULL where no delay</td></tr>
+                <tr><td>AIRLINE_DELAY</td><td class="pct-cell">0 → NULL where no delay</td></tr>
+                <tr><td>WEATHER_DELAY</td><td class="pct-cell">0 → NULL where no delay</td></tr>
+                <tr><td>LATE_AIRCRAFT_DELAY</td><td class="pct-cell">0 → NULL where no delay</td></tr>
+                <tr><td>SECURITY_DELAY</td><td class="pct-cell">0 → NULL where no delay</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fix 3 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">Fix 3</span>
+            <span class="query-title">Cancellation Code Mapping</span>
+          </div>
+          <span class="query-tag">CASE WHEN</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">ALTER TABLE</span> flights
+<span class="kw">ADD COLUMN</span> CANCELLATION_REASON_DESC <span class="fn">VARCHAR</span>(<span class="num">50</span>);
+
+<span class="kw">UPDATE</span> flights
+<span class="kw">SET</span> CANCELLATION_REASON_DESC = <span class="kw">CASE</span> CANCELLATION_REASON
+    <span class="kw">WHEN</span> <span class="str">'A'</span> <span class="kw">THEN</span> <span class="str">'Airline/Carrier'</span>
+    <span class="kw">WHEN</span> <span class="str">'B'</span> <span class="kw">THEN</span> <span class="str">'Weather'</span>
+    <span class="kw">WHEN</span> <span class="str">'C'</span> <span class="kw">THEN</span> <span class="str">'National Air System'</span>
+    <span class="kw">WHEN</span> <span class="str">'D'</span> <span class="kw">THEN</span> <span class="str">'Security'</span>
+    <span class="kw">ELSE</span> <span class="kw">NULL</span>
+<span class="kw">END</span>;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result — Cancellation Code Mapping</div>
+            <table class="result-table">
+              <thead><tr><th>Code</th><th>Description</th><th>Count (approx)</th></tr></thead>
+              <tbody>
+                <tr><td>A</td><td>Airline/Carrier</td><td class="num-cell">~36,500</td></tr>
+                <tr><td>B</td><td>Weather</td><td class="num-cell">~27,000</td></tr>
+                <tr><td>C</td><td>National Air System</td><td class="num-cell">~24,500</td></tr>
+                <tr><td>D</td><td>Security</td><td class="num-cell">~290</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- View -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">VIEW</span>
+            <span class="query-title">Create Unified Analytical View — flights_clean</span>
+          </div>
+          <span class="query-tag">CREATE VIEW · JOIN</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">CREATE VIEW</span> <span class="fn">flights_clean</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+    f.*,
+    al.AIRLINE           <span class="kw">AS</span> AIRLINE_NAME,
+    ap_orig.CITY         <span class="kw">AS</span> ORIGIN_CITY,
+    ap_orig.STATE        <span class="kw">AS</span> ORIGIN_STATE,
+    ap_dest.CITY         <span class="kw">AS</span> DESTINATION_CITY,
+    ap_dest.STATE        <span class="kw">AS</span> DESTINATION_STATE
+<span class="kw">FROM</span> flights f
+<span class="kw">JOIN</span> airlines al      <span class="kw">ON</span> f.AIRLINE             = al.IATA_CODE
+<span class="kw">JOIN</span> airports ap_orig <span class="kw">ON</span> f.ORIGIN_AIRPORT      = ap_orig.IATA_CODE
+<span class="kw">JOIN</span> airports ap_dest <span class="kw">ON</span> f.DESTINATION_AIRPORT = ap_dest.IATA_CODE;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>View</th><th>Status</th><th>New Columns Added</th></tr></thead>
+              <tbody>
+                <tr><td>flights_clean</td><td class="pct-cell">✓ Created</td><td>AIRLINE_NAME, ORIGIN_CITY, ORIGIN_STATE, DESTINATION_CITY, DESTINATION_STATE</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- PHASE 3 -->
+  <section id="phase3" class="phase-block">
+    <div class="phase-label">
+      <span class="phase-number">Phase 03</span>
+      <span class="phase-title">EDA &amp; KPI Queries</span>
+      <div class="phase-divider"></div>
+    </div>
+
+    <div class="query-grid">
+
+      <!-- KPI 1 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 1</span>
+            <span class="query-title">Overall Flight Performance Summary</span>
+          </div>
+          <span class="query-tag">AVG · SUM · ROUND</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span>
+    <span class="fn">COUNT</span>(*)                                          <span class="kw">AS</span> total_flights,
+    <span class="fn">SUM</span>(CANCELLED)                                    <span class="kw">AS</span> total_cancelled,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(CANCELLED) * <span class="num">100.0</span> / <span class="fn">COUNT</span>(*), <span class="num">2</span>)   <span class="kw">AS</span> cancellation_rate,
+    <span class="fn">SUM</span>(DIVERTED)                                     <span class="kw">AS</span> total_diverted,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(ARRIVAL_DELAY), <span class="num">2</span>)                    <span class="kw">AS</span> avg_arrival_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(DEPARTURE_DELAY), <span class="num">2</span>)                  <span class="kw">AS</span> avg_departure_delay
+<span class="kw">FROM</span> flights;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>total_flights</th><th>total_cancelled</th><th>cancellation_rate</th><th>total_diverted</th><th>avg_arrival_delay</th><th>avg_departure_delay</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="num-cell">5,819,079</td>
+                  <td class="num-cell">89,884</td>
+                  <td class="pct-cell">1.54%</td>
+                  <td class="num-cell">15,971</td>
+                  <td class="num-cell">6.89 min</td>
+                  <td class="num-cell">10.52 min</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 2</span>
+            <span class="query-title">Airline-wise Performance Benchmarking</span>
+          </div>
+          <span class="query-tag">GROUP BY · CASE WHEN</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span>
+    AIRLINE_NAME,
+    <span class="fn">COUNT</span>(*)                                                              <span class="kw">AS</span> total_flights,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(ARRIVAL_DELAY), <span class="num">2</span>)                                        <span class="kw">AS</span> avg_arrival_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(DEPARTURE_DELAY), <span class="num">2</span>)                                      <span class="kw">AS</span> avg_departure_delay,
+    <span class="fn">SUM</span>(CANCELLED)                                                        <span class="kw">AS</span> total_cancelled,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(CANCELLED) * <span class="num">100.0</span> / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                      <span class="kw">AS</span> cancellation_rate,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(<span class="kw">CASE WHEN</span> ARRIVAL_DELAY &lt;= <span class="num">15</span> <span class="kw">THEN</span> <span class="num">1</span> <span class="kw">ELSE</span> <span class="num">0</span> <span class="kw">END</span>) * <span class="num">100.0</span>
+        / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                                                  <span class="kw">AS</span> on_time_rate
+<span class="kw">FROM</span> flights_clean
+<span class="kw">GROUP BY</span> AIRLINE_NAME
+<span class="kw">ORDER BY</span> on_time_rate <span class="kw">DESC</span>;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result — Top 6 Airlines by On-Time Rate</div>
+            <table class="result-table">
+              <thead><tr><th>Airline</th><th>Flights</th><th>Avg Arr Delay</th><th>Cancellation Rate</th><th>On-Time Rate</th></tr></thead>
+              <tbody>
+                <tr><td>Alaska Airlines</td><td class="num-cell">172,521</td><td class="num-cell">0.84 min</td><td class="pct-cell">0.57%</td><td class="pct-cell">83.1%</td></tr>
+                <tr><td>Hawaiian Airlines</td><td class="num-cell">70,806</td><td class="num-cell">3.29 min</td><td class="pct-cell">0.18%</td><td class="pct-cell">82.6%</td></tr>
+                <tr><td>Delta Air Lines</td><td class="num-cell">875,881</td><td class="num-cell">2.01 min</td><td class="pct-cell">0.64%</td><td class="pct-cell">81.1%</td></tr>
+                <tr><td>US Airways</td><td class="num-cell">198,715</td><td class="num-cell">8.01 min</td><td class="pct-cell">1.31%</td><td class="pct-cell">77.5%</td></tr>
+                <tr><td>Southwest Airlines</td><td class="num-cell">1,172,075</td><td class="num-cell">7.75 min</td><td class="pct-cell">1.85%</td><td class="pct-cell">75.9%</td></tr>
+                <tr><td>Spirit Airlines</td><td class="num-cell">119,553</td><td class="num-cell">17.68 min</td><td class="pct-cell">1.97%</td><td class="pct-cell">67.2%</td></tr>
+              </tbody>
+            </table>
+            <div class="row-count">14 rows returned · Ordered by on_time_rate DESC</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 3</span>
+            <span class="query-title">Month-wise Trend Analysis</span>
+          </div>
+          <span class="query-tag">GROUP BY MONTH</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span>
+    MONTH,
+    <span class="fn">COUNT</span>(*)                                                              <span class="kw">AS</span> total_flights,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(ARRIVAL_DELAY), <span class="num">2</span>)                                        <span class="kw">AS</span> avg_arrival_delay,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(CANCELLED) * <span class="num">100.0</span> / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                      <span class="kw">AS</span> cancellation_rate,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(<span class="kw">CASE WHEN</span> ARRIVAL_DELAY &lt;= <span class="num">15</span> <span class="kw">THEN</span> <span class="num">1</span> <span class="kw">ELSE</span> <span class="num">0</span> <span class="kw">END</span>) * <span class="num">100.0</span>
+        / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                                                  <span class="kw">AS</span> on_time_rate
+<span class="kw">FROM</span> flights
+<span class="kw">GROUP BY</span> MONTH
+<span class="kw">ORDER BY</span> MONTH;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Month</th><th>Flights</th><th>Avg Delay</th><th>Cancel Rate</th><th>On-Time %</th></tr></thead>
+              <tbody>
+                <tr><td>Jan</td><td class="num-cell">476,234</td><td class="num-cell">13.21</td><td class="num-cell">3.12%</td><td class="pct-cell">66.4%</td></tr>
+                <tr><td>Feb</td><td class="num-cell">431,073</td><td class="num-cell">15.41</td><td class="num-cell">3.59%</td><td class="pct-cell">63.1%</td></tr>
+                <tr><td>Mar</td><td class="num-cell">504,312</td><td class="num-cell">8.76</td><td class="num-cell">1.64%</td><td class="pct-cell">73.2%</td></tr>
+                <tr><td>Jun</td><td class="num-cell">512,588</td><td class="num-cell">9.87</td><td class="num-cell">0.91%</td><td class="pct-cell">71.8%</td></tr>
+                <tr><td>Sep</td><td class="num-cell">467,119</td><td class="num-cell">2.14</td><td class="num-cell">0.54%</td><td class="pct-cell">82.3%</td></tr>
+                <tr><td>Dec</td><td class="num-cell">481,906</td><td class="num-cell">11.30</td><td class="num-cell">2.10%</td><td class="pct-cell">68.9%</td></tr>
+              </tbody>
+            </table>
+            <div class="row-count">12 rows returned · September = best on-time performance</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 4 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 4</span>
+            <span class="query-title">Delay Type Breakdown</span>
+          </div>
+          <span class="query-tag">AVG · WHERE CANCELLED=0</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span>
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(AIRLINE_DELAY),       <span class="num">2</span>) <span class="kw">AS</span> avg_airline_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(WEATHER_DELAY),       <span class="num">2</span>) <span class="kw">AS</span> avg_weather_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(AIR_SYSTEM_DELAY),    <span class="num">2</span>) <span class="kw">AS</span> avg_air_system_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(LATE_AIRCRAFT_DELAY), <span class="num">2</span>) <span class="kw">AS</span> avg_late_aircraft_delay,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(SECURITY_DELAY),     <span class="num">2</span>) <span class="kw">AS</span> avg_security_delay
+<span class="kw">FROM</span> flights
+<span class="kw">WHERE</span> CANCELLED = <span class="num">0</span>;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>Delay Type</th><th>Avg Minutes</th></tr></thead>
+              <tbody>
+                <tr><td>Airline Delay</td><td class="num-cell">16.48</td></tr>
+                <tr><td>Late Aircraft Delay</td><td class="num-cell">22.31</td></tr>
+                <tr><td>Air System Delay</td><td class="num-cell">14.67</td></tr>
+                <tr><td>Weather Delay</td><td class="num-cell">19.08</td></tr>
+                <tr><td>Security Delay</td><td class="num-cell">4.12</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 5 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 5</span>
+            <span class="query-title">Delay Types in Row Format (for Power BI)</span>
+          </div>
+          <span class="query-tag">UNION ALL</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span> <span class="str">'Airline Delay'</span>     <span class="kw">AS</span> delay_type, <span class="fn">ROUND</span>(<span class="fn">AVG</span>(AIRLINE_DELAY), <span class="num">2</span>)       <span class="kw">AS</span> avg_minutes <span class="kw">FROM</span> flights_clean
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> <span class="str">'Weather Delay'</span>,                   <span class="fn">ROUND</span>(<span class="fn">AVG</span>(WEATHER_DELAY), <span class="num">2</span>)       <span class="kw">FROM</span> flights_clean
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> <span class="str">'Air System Delay'</span>,                <span class="fn">ROUND</span>(<span class="fn">AVG</span>(AIR_SYSTEM_DELAY), <span class="num">2</span>)    <span class="kw">FROM</span> flights_clean
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> <span class="str">'Late Aircraft'</span>,                   <span class="fn">ROUND</span>(<span class="fn">AVG</span>(LATE_AIRCRAFT_DELAY), <span class="num">2</span>) <span class="kw">FROM</span> flights_clean
+<span class="kw">UNION ALL</span>
+<span class="kw">SELECT</span> <span class="str">'Security Delay'</span>,                  <span class="fn">ROUND</span>(<span class="fn">AVG</span>(SECURITY_DELAY), <span class="num">2</span>)     <span class="kw">FROM</span> flights_clean;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result — Formatted for Power BI Bar Chart</div>
+            <table class="result-table">
+              <thead><tr><th>delay_type</th><th>avg_minutes</th></tr></thead>
+              <tbody>
+                <tr><td>Airline Delay</td><td class="num-cell">16.48</td></tr>
+                <tr><td>Weather Delay</td><td class="num-cell">19.08</td></tr>
+                <tr><td>Air System Delay</td><td class="num-cell">14.67</td></tr>
+                <tr><td>Late Aircraft</td><td class="num-cell">22.31</td></tr>
+                <tr><td>Security Delay</td><td class="num-cell">4.12</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 6 -->
+      <div class="query-card" onclick="toggle(this)">
+        <div class="query-header">
+          <div class="query-meta">
+            <span class="query-num">KPI 6</span>
+            <span class="query-title">Month-wise with Month Names (Power BI Slicer)</span>
+          </div>
+          <span class="query-tag">CASE WHEN · MONTH NAMES</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="query-body">
+          <div class="code-block">
+            <div class="code-label">SQL</div>
+<pre><span class="kw">SELECT</span>
+    MONTH,
+    <span class="kw">CASE</span> MONTH
+        <span class="kw">WHEN</span> <span class="num">1</span>  <span class="kw">THEN</span> <span class="str">'Jan'</span> <span class="kw">WHEN</span> <span class="num">2</span>  <span class="kw">THEN</span> <span class="str">'Feb'</span> <span class="kw">WHEN</span> <span class="num">3</span>  <span class="kw">THEN</span> <span class="str">'Mar'</span>
+        <span class="kw">WHEN</span> <span class="num">4</span>  <span class="kw">THEN</span> <span class="str">'Apr'</span> <span class="kw">WHEN</span> <span class="num">5</span>  <span class="kw">THEN</span> <span class="str">'May'</span> <span class="kw">WHEN</span> <span class="num">6</span>  <span class="kw">THEN</span> <span class="str">'Jun'</span>
+        <span class="kw">WHEN</span> <span class="num">7</span>  <span class="kw">THEN</span> <span class="str">'Jul'</span> <span class="kw">WHEN</span> <span class="num">8</span>  <span class="kw">THEN</span> <span class="str">'Aug'</span> <span class="kw">WHEN</span> <span class="num">9</span>  <span class="kw">THEN</span> <span class="str">'Sep'</span>
+        <span class="kw">WHEN</span> <span class="num">10</span> <span class="kw">THEN</span> <span class="str">'Oct'</span> <span class="kw">WHEN</span> <span class="num">11</span> <span class="kw">THEN</span> <span class="str">'Nov'</span> <span class="kw">WHEN</span> <span class="num">12</span> <span class="kw">THEN</span> <span class="str">'Dec'</span>
+    <span class="kw">END</span>                                                                   <span class="kw">AS</span> MONTH_NAME,
+    <span class="fn">COUNT</span>(*)                                                              <span class="kw">AS</span> total_flights,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(ARRIVAL_DELAY), <span class="num">2</span>)                                        <span class="kw">AS</span> avg_arrival_delay,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(CANCELLED) * <span class="num">100.0</span> / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                      <span class="kw">AS</span> cancellation_rate,
+    <span class="fn">ROUND</span>(<span class="fn">SUM</span>(<span class="kw">CASE WHEN</span> ARRIVAL_DELAY &lt;= <span class="num">15</span> <span class="kw">THEN</span> <span class="num">1</span> <span class="kw">ELSE</span> <span class="num">0</span> <span class="kw">END</span>) * <span class="num">100.0</span>
+        / <span class="fn">COUNT</span>(*), <span class="num">2</span>)                                                  <span class="kw">AS</span> on_time_rate
+<span class="kw">FROM</span> flights_clean
+<span class="kw">GROUP BY</span> MONTH
+<span class="kw">ORDER BY</span> MONTH;</pre>
+          </div>
+          <div class="result-block">
+            <div class="result-label">Result</div>
+            <table class="result-table">
+              <thead><tr><th>MONTH</th><th>MONTH_NAME</th><th>total_flights</th><th>avg_arrival_delay</th><th>cancellation_rate</th><th>on_time_rate</th></tr></thead>
+              <tbody>
+                <tr><td class="num-cell">1</td><td>Jan</td><td class="num-cell">476,234</td><td class="num-cell">13.21</td><td class="num-cell">3.12%</td><td class="pct-cell">66.4%</td></tr>
+                <tr><td class="num-cell">2</td><td>Feb</td><td class="num-cell">431,073</td><td class="num-cell">15.41</td><td class="num-cell">3.59%</td><td class="pct-cell">63.1%</td></tr>
+                <tr><td class="num-cell">3</td><td>Mar</td><td class="num-cell">504,312</td><td class="num-cell">8.76</td><td class="num-cell">1.64%</td><td class="pct-cell">73.2%</td></tr>
+                <tr><td class="num-cell">9</td><td>Sep</td><td class="num-cell">467,119</td><td class="num-cell">2.14</td><td class="num-cell">0.54%</td><td class="pct-cell">82.3%</td></tr>
+                <tr><td class="num-cell">12</td><td>Dec</td><td class="num-cell">481,906</td><td class="num-cell">11.30</td><td class="num-cell">2.10%</td><td class="pct-cell">68.9%</td></tr>
+              </tbody>
+            </table>
+            <div class="row-count">12 rows returned</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- POWER BI -->
+  <section id="powerbi" class="powerbi-section">
+    <div class="phase-label">
+      <span class="phase-number">Power BI</span>
+      <span class="phase-title">Interactive Dashboards</span>
+      <div class="phase-divider"></div>
+    </div>
+
+    <div class="powerbi-grid">
+      <div class="powerbi-card">
+        <div class="powerbi-tag">Dashboard 01</div>
+        <div class="powerbi-placeholder">📊</div>
+        <div class="powerbi-placeholder-text">Airline Performance Overview<br><span style="font-size:10px;opacity:0.6">Add screenshot or embed link</span></div>
+      </div>
+      <div class="powerbi-card">
+        <div class="powerbi-tag">Dashboard 02</div>
+        <div class="powerbi-placeholder">📊</div>
+        <div class="powerbi-placeholder-text">Delay Analysis Breakdown<br><span style="font-size:10px;opacity:0.6">Add screenshot or embed link</span></div>
+      </div>
+      <div class="powerbi-card">
+        <div class="powerbi-tag">Dashboard 03</div>
+        <div class="powerbi-placeholder">📊</div>
+        <div class="powerbi-placeholder-text">Monthly Trend &amp; Cancellations<br><span style="font-size:10px;opacity:0.6">Add screenshot or embed link</span></div>
+      </div>
+      <div class="powerbi-card">
+        <div class="powerbi-tag">Dashboard 04</div>
+        <div class="powerbi-placeholder">📊</div>
+        <div class="powerbi-placeholder-text">Route &amp; Airport Analysis<br><span style="font-size:10px;opacity:0.6">Add screenshot or embed link</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSIGHTS -->
+  <section id="insights" class="phase-block">
+    <div class="phase-label">
+      <span class="phase-number">Insights</span>
+      <span class="phase-title">Key Findings</span>
+      <div class="phase-divider"></div>
+    </div>
+    <div class="insight-grid">
+      <div class="insight-card">
+        <div class="insight-number">83.1%</div>
+        <div class="insight-desc">Alaska Airlines had the highest on-time rate across all 14 carriers in 2015</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-number">22.3 min</div>
+        <div class="insight-desc">Late Aircraft Delay was the largest average delay type — cascading effect from prior flights</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-number">Feb</div>
+        <div class="insight-desc">February had the worst performance — highest cancellation rate (3.59%) and most delays</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-number">Sep</div>
+        <div class="insight-desc">September was the best month — lowest cancellations (0.54%) and best on-time rate (82.3%)</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="https://github.com/pritwrk" target="_blank">GitHub</a>
+      <a href="https://linkedin.com/in/pritam-verma-02721531a" target="_blank">LinkedIn</a>
+      <a href="#">View SQL File</a>
+      <a href="#">Power BI Report</a>
+    </div>
+    <div class="footer-credit">Built by Pritam Verma · U.S. Airline Performance Analysis · MySQL + Power BI</div>
+  </div>
+</footer>
+
+<script>
+  function toggle(card) {
+    card.classList.toggle('open');
+  }
+
+  // Nav active state on scroll
+  const sections = document.querySelectorAll('section[id], div[id]');
+  const navLinks = document.querySelectorAll('.nav-inner a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+</script>
+
+</body>
+</html>
