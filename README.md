@@ -2,7 +2,7 @@
 
 *Analyzing 5.8 million flight records across 14 U.S. carriers — from raw CSV to business intelligence using structured SQL.*
 
-[![Live Demo]([https://img.shields.io/badge/🌐%20Live%20Dashboard-View%20Here-3b82f6?style=for-the-badge](https://pritwrk.github.io/Airline-analysis/))](https://pritwrk.github.io/airline-sql-analysis/)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Dashboard-View%20Here-3b82f6?style=for-the-badge)](https://pritwrk.github.io/airline-sql-analysis/)
 [![View Repository](https://img.shields.io/badge/View%20Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/pritwrk/airline-sql-analysis)
 
 ---
@@ -131,7 +131,7 @@ airline-sql-analysis/
 
 ## 🌐 Live Dashboard
 
-> 🔗 **[View Interactive SQL Dashboard →](https://pritwrk.github.io/airline-sql-analysis/)**
+> 🔗 **[View Interactive SQL Dashboard →](https://pritwrk.github.io/Airline-analysis/)**
 
 The live dashboard is built in pure HTML/CSS/JS and hosted on GitHub Pages. It includes:
 
